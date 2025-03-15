@@ -1,0 +1,101 @@
+import numpy as np
+import cv2
+import easyocr
+import requests
+
+FLASK_SERVER_URL = "http://127.0.0.1:5000/receive_text"
+
+reader = easyocr.Reader(['en'])
+
+# Bigger handwriting space
+canvas_width, canvas_height = 1200, 600
+canvas = np.ones((canvas_height, canvas_width), dtype=np.uint8) * 255
+recognized_texts = []
+
+drawing = False
+prev_x, prev_y = None, None
+
+def draw_with_mouse(event, x, y, flags, param):
+    """Handles mouse input for drawing."""
+    global drawing, prev_x, prev_y, canvas
+
+    if event == cv2.EVENT_LBUTTONDOWN:
+        drawing = True
+        prev_x, prev_y = x, y
+    elif event == cv2.EVENT_MOUSEMOVE and drawing:
+        if prev_x is not None and prev_y is not None:
+            cv2.line(canvas, (prev_x, prev_y), (x, y), (0, 0, 0), thickness=5)
+        prev_x, prev_y = x, y
+    elif event == cv2.EVENT_LBUTTONUP:
+        drawing = False
+        prev_x, prev_y = None, None
+
+def group_words_by_line(results, line_threshold=15):
+    """Groups words into sentences based on Y-coordinate proximity."""
+    results.sort(key=lambda x: x[0][0][1])  # Sort by Y coordinate
+    lines = []
+    current_line = []
+
+    for i, (bbox, text, confidence) in enumerate(results):
+        if not current_line:
+            current_line.append(text)
+            prev_y = bbox[0][1]
+        else:
+            if abs(bbox[0][1] - prev_y) < line_threshold:
+                current_line.append(text)
+            else:
+                lines.append(" ".join(current_line))
+                current_line = [text]
+            prev_y = bbox[0][1]
+
+    if current_line:
+        lines.append(" ".join(current_line))
+
+    return "\n".join(lines)
+
+def recognize_handwriting():
+    """Processes handwriting and sends it to the Flask server."""
+    global recognized_texts
+    gray = cv2.bitwise_not(canvas)
+    cv2.imwrite("temp.png", gray)
+
+    result = reader.readtext("temp.png")
+
+    if result:
+        text = group_words_by_line(result)
+        recognized_texts.append(text)
+
+        try:
+            response = requests.post(
+                FLASK_SERVER_URL, json={"text": text}, timeout=5
+            )
+            if response.status_code == 200:
+                print("✅ Sent to website:", text)
+            else:
+                print(f"❌ Website error {response.status_code}: {response.text}")
+        except requests.exceptions.RequestException as e:
+            print("❌ Error sending to website:", e)
+
+cv2.namedWindow("Handwriting Pad", cv2.WINDOW_NORMAL)
+cv2.resizeWindow("Handwriting Pad", canvas_width, canvas_height)
+cv2.setMouseCallback("Handwriting Pad", draw_with_mouse)
+
+while True:
+    cv2.imshow("Handwriting Pad", canvas)
+
+    text_display = np.ones((150, canvas_width), dtype=np.uint8) * 255
+    cv2.putText(text_display, f"Recognized: {' '.join(recognized_texts)}", (10, 50),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2, cv2.LINE_AA)
+    cv2.imshow("Recognized Text", text_display)
+
+    key = cv2.waitKey(1) & 0xFF
+
+    if key == ord('s'):
+        recognize_handwriting()
+    elif key == ord('c'):
+        canvas[:] = 255
+        recognized_texts.clear()
+    elif key == ord('q'):
+        break
+
+cv2.destroyAllWindows()
