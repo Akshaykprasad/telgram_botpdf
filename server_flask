@@ -1,0 +1,75 @@
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import requests
+from reportlab.pdfgen import canvas
+
+app = Flask(__name__)
+CORS(app)  # Allow frontend to access backend
+
+TELEGRAM_BOT_TOKEN = "7621364067:AAHEdNXg31rWlq8ww-ZN5u1Hi_ffqxUmYco"
+TELEGRAM_CHAT_ID = "5352340512"
+PDF_FILE_PATH = "recognized_text.pdf"
+
+recognized_texts = []
+
+
+def save_text_as_pdf(text, filename=PDF_FILE_PATH):
+    """Creates a PDF from recognized text."""
+    c = canvas.Canvas(filename)
+    lines = text.split("\n")
+    y_position = 750
+
+    for line in lines:
+        c.drawString(100, y_position, line)
+        y_position -= 20
+
+    c.save()
+    return filename
+
+
+@app.route("/receive_text", methods=["POST"])
+def receive_text():
+    """Receive recognized text."""
+    data = request.json
+    if "text" not in data:
+        return jsonify({"message": "No text received!"}), 400
+
+    recognized_texts.append(data["text"])
+    print("Received text:", data["text"])
+    return jsonify({"message": "Text received successfully!"})
+
+
+@app.route("/get_text", methods=["GET"])
+def get_text():
+    """Send the latest recognized text to the webpage."""
+    if not recognized_texts:
+        return jsonify({"recognized_text": "No text recognized yet."})
+
+    return jsonify({"recognized_text": " ".join(recognized_texts)})
+
+
+@app.route("/send_to_telegram", methods=["POST"])
+def send_to_telegram():
+    """Send recognized text as a PDF via Telegram."""
+    if not recognized_texts:
+        return jsonify({"message": "No text to send!"}), 400
+
+    text_to_send = "\n".join(recognized_texts)
+    pdf_path = save_text_as_pdf(text_to_send)
+
+    telegram_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendDocument"
+
+    with open(pdf_path, "rb") as pdf_file:
+        files = {"document": pdf_file}
+        data = {"chat_id": TELEGRAM_CHAT_ID, "caption": "📄 Recognized Text PDF"}
+        response = requests.post(telegram_url, data=data, files=files)
+
+    if response.status_code == 200:
+        print(f"✅ PDF sent to Telegram: {pdf_path}")
+        return jsonify({"message": "PDF sent to Telegram!"})
+    else:
+        return jsonify({"message": "Failed to send PDF to Telegram!", "error": response.text}), 500
+
+
+if __name__ == "__main__":
+    app.run(debug=True, port=5000, host="0.0.0.0")
