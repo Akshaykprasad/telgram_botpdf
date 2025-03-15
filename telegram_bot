@@ -1,0 +1,14 @@
+
+import telegram
+import asyncio
+
+TELEGRAM_BOT_TOKEN = "7621364067:AAHEdNXg31rWlq8ww-ZN5u1Hi_ffqxUmYco"
+TELEGRAM_USER_ID = "5352340512"
+PDF_PATH = "test.pdf"  # Ensure this file exists in the same directory
+
+async def send_pdf():
+    bot = telegram.Bot(token=TELEGRAM_BOT_TOKEN)
+    with open(PDF_PATH, "rb") as pdf_file:
+        await bot.send_document(TELEGRAM_USER_ID, pdf_file, caption="📄 Here is your test PDF!")
+
+asyncio.run(send_pdf())
