@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Handwriting Recognition</title>
+</head>
+<body>
+    <h2>Recognized Text</h2>
+    <p id="recognizedText">Waiting for handwriting recognition...</p>
+    
+    <button onclick="fetchRecognizedText()">Refresh</button>
+    <button onclick="sendPDFToTelegram()">Send as PDF</button>
+
+    <script>
+        function fetchRecognizedText() {
+            fetch("http://127.0.0.1:5000/get_text", { method: "GET", mode: "cors" })
+            .then(response => response.json())
+            .then(data => document.getElementById("recognizedText").innerText = data.recognized_text)
+            .catch(error => console.error("Error:", error));
+        }
+
+        function sendPDFToTelegram() {
+            fetch("http://127.0.0.1:5000/send_to_telegram", { method: "POST", mode: "cors" })
+            .then(response => response.json())
+            .then(data => alert(data.message))
+            .catch(error => console.error("Error:", error));
+        }
+    </script>
+</body>
+</html>
