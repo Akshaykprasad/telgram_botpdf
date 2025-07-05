@@ -6,8 +6,8 @@ from reportlab.pdfgen import canvas
 app = Flask(__name__)
 CORS(app)  # Allow frontend to access backend
 
-TELEGRAM_BOT_TOKEN = "7621364067:AAHEdNXg31rWlq8ww-ZN5u1Hi_ffqxUmYco"
-TELEGRAM_CHAT_ID = "5352340512"
+TELEGRAM_BOT_TOKEN = ""
+TELEGRAM_CHAT_ID = ""
 PDF_FILE_PATH = "recognized_text.pdf"
 
 recognized_texts = []
